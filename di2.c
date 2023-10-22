@@ -57,28 +57,28 @@ void main() {
 
     int niters = 0;
     int nnormals = 0;
-    int yincC = (cA >> 4) + (cA >> 3);      // 12*cA >> 6;
-    int yincS = (sA >> 4) + (sA >> 3);      // 12*sA >> 6;
-    int xincX = (cB >> 5) + (cB >> 4);      // 6*cB >> 6;
-    int xincY = (sAsB >> 5) + (sAsB >> 4);  // 6*sAsB >> 6;
-    int xincZ = (cAsB >> 5) + (cAsB >> 4);  // 6*cAsB >> 6;
-    int ycA = -((cA << 1) + (cA >> 2));     // -12 * yinc1 = -9*cA >> 2;
-    int ysA = -((sA << 1) + (sA >> 2));     // -12 * yinc2 = -9*sA >> 2;
+    int16_t yincC = (cA >> 6) + (cA >> 5);      // 12*cA >> 8;
+    int16_t yincS = (sA >> 6) + (sA >> 5);      // 12*sA >> 8;
+    int16_t xincX = (cB >> 7) + (cB >> 6);      // 6*cB >> 8;
+    int16_t xincY = (sAsB >> 7) + (sAsB >> 6);  // 6*sAsB >> 8;
+    int16_t xincZ = (cAsB >> 7) + (cAsB >> 6);  // 6*cAsB >> 8;
+    int16_t ycA = -((cA >> 1) + (cA >> 4));     // -12 * yinc1 = -9*cA >> 4;
+    int16_t ysA = -((sA >> 1) + (sA >> 4));     // -12 * yinc2 = -9*sA >> 4;
     for (int j = 0; j < 23; j++, ycA += yincC, ysA += yincS) {
       //int xsAsB = -40*xincY;
-      int xsAsB = (sAsB >> 2) - (sAsB << 2);  // -40*xincY
-      int xcAsB = (cAsB >> 2) - (cAsB << 2);  // -40*xincZ;
+      int xsAsB = (sAsB >> 4) - sAsB;  // -40*xincY
+      int xcAsB = (cAsB >> 4) - cAsB;  // -40*xincZ;
 
-      int vxi16 = (cB >> 2) - (cB << 2) - (sB << 2); // -40*xincX - (sB << 2);
-      int vyi16 = ycA - (sAcB<<2) - xsAsB;
-      int vzi16 = ysA + (cAcB<<2) + xcAsB;
+      int16_t vxi14 = (cB >> 4) - cB - sB; // -40*xincX - (sB << 2);
+      int16_t vyi14 = ycA - xsAsB - sAcB;
+      int16_t vzi14 = ysA + xcAsB + cAcB;
 
-      for (int i = 0; i < 79; i++, vxi16 += xincX, vyi16 -= xincY, vzi16 += xincZ) {
+      for (int i = 0; i < 79; i++, vxi14 += xincX, vyi14 -= xincY, vzi14 += xincZ) {
         int t = 512; // (256 * dz) - r2i - r1i;
 
-        int16_t px = p0x + (vxi16 >> 7); // assuming t = 512, t*vxi>>8 == vxi<<1
-        int16_t py = p0y + (vyi16 >> 7);
-        int16_t pz = p0z + (vzi16 >> 7);
+        int16_t px = p0x + (vxi14 >> 5); // assuming t = 512, t*vxi>>8 == vxi<<1
+        int16_t py = p0y + (vyi14 >> 5);
+        int16_t pz = p0z + (vzi14 >> 5);
         debug("pxyz (%+4d,%+4d,%+4d)\n", px, py, pz);
         for (;;) {
           int t0, t1, t2, d;
@@ -92,9 +92,9 @@ void main() {
           t2 = length_cordic(pz, t1, &lz, lx);
           d = t2 - r1i;
           t += d;
-          px += d*vxi16 >> 16;
-          py += d*vyi16 >> 16;
-          pz += d*vzi16 >> 16;
+          px += d*vxi14 >> 14;
+          py += d*vyi14 >> 14;
+          pz += d*vzi14 >> 14;
           if (t > 8*256) {
             putchar(' ');
             break;
