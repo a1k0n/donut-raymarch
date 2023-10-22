@@ -57,22 +57,24 @@ void main() {
 
     int niters = 0;
     int nnormals = 0;
-    int yinc1 = (cA >> 4) + (cA >> 3);      // 12*cA >> 6;
-    int yinc2 = (sA >> 4) + (sA >> 3);      // 12*sA >> 6;
-    int xinc1 = (sAsB >> 5) + (sAsB >> 4);  // 6*sAsB >> 6;
-    int xinc2 = (cAsB >> 5) + (cAsB >> 4);  // 6*cAsB >> 6;
-    int xinc3 = (cB >> 5) + (cB >> 4);      // 6*cB >> 6;
+    int yincC = (cA >> 4) + (cA >> 3);      // 12*cA >> 6;
+    int yincS = (sA >> 4) + (sA >> 3);      // 12*sA >> 6;
+    int xincX = (cB >> 5) + (cB >> 4);      // 6*cB >> 6;
+    int xincY = (sAsB >> 5) + (sAsB >> 4);  // 6*sAsB >> 6;
+    int xincZ = (cAsB >> 5) + (cAsB >> 4);  // 6*cAsB >> 6;
     int ycA = -((cA << 1) + (cA >> 2));     // -12 * yinc1 = -9*cA >> 2;
     int ysA = -((sA << 1) + (sA >> 2));     // -12 * yinc2 = -9*sA >> 2;
-    for (int j = 0; j < 23; j++, ycA += yinc1, ysA += yinc2) {
-      int xsAsB = -40*xinc1;
-      int xcAsB = -40*xinc2;
-      int vxi16 = -40*xinc3 - (sB << 2);
+    for (int j = 0; j < 23; j++, ycA += yincC, ysA += yincS) {
+      //int xsAsB = -40*xincY;
+      int xsAsB = (sAsB >> 2) - (sAsB << 2);  // -40*xincY
+      int xcAsB = (cAsB >> 2) - (cAsB << 2);  // -40*xincZ;
+
+      int vxi16 = (cB >> 2) - (cB << 2) - (sB << 2); // -40*xincX - (sB << 2);
       int vyi16 = ycA - (sAcB<<2) - xsAsB;
       int vzi16 = ysA + (cAcB<<2) + xcAsB;
-      for (int i = 0; i < 79; i++, vyi16 -= xinc1, vzi16 += xinc2, vxi16 += xinc3) {
-        //int t = (int) (256 * dz) - r2i - r1i;
-        int t = 512;
+
+      for (int i = 0; i < 79; i++, vxi16 += xincX, vyi16 -= xincY, vzi16 += xincZ) {
+        int t = 512; // (256 * dz) - r2i - r1i;
 
         int16_t px = p0x + (vxi16 >> 7); // assuming t = 512, t*vxi>>8 == vxi<<1
         int16_t py = p0y + (vyi16 >> 7);
