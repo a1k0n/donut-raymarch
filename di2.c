@@ -12,7 +12,7 @@ const int dz = 5, r1 = 1, r2 = 2;
 
 // CORDIC algorithm to find magnitude of |x,y|
 // also bring vector (x2,y2) along for the ride, and write back to x2
-int length_cordic(int16_t x, int16_t y, int *x2_, int y2) {
+int length_cordic(int16_t x, int16_t y, int16_t *x2_, int16_t y2) {
   int x2 = *x2_;
   if (x < 0) { // start in right half-plane
     x = -x;
@@ -48,26 +48,22 @@ void main() {
   for (;;) {
     int x1_16 = cAcB << 2;
 
-    int p0x = dz*sB >> 6;
-    int p0y = dz*sAcB >> 6;
-    int p0z = -dz*cAcB >> 6;
-
-    int lxi = sB >> 6;
-    int lyi = sAcB - cA >> 6;
-    int lzi = -cAcB - sA >> 6;
+    int p0x = dz * sB >> 6;
+    int p0y = dz * sAcB >> 6;
+    int p0z = -dz * cAcB >> 6;
 
     const int r1i = r1*256;
     const int r2i = r2*256;
 
     int niters = 0;
     int nnormals = 0;
-    int yinc1 = 12*cA >> 6;
-    int yinc2 = 12*sA >> 6;
-    int xinc1 = 6*sAsB >> 6;
-    int xinc2 = 6*cAsB >> 6;
-    int xinc3 = 6*cB >> 6;
-    int ycA = -12*yinc1;
-    int ysA = -12*yinc2;
+    int yinc1 = (cA >> 4) + (cA >> 3);      // 12*cA >> 6;
+    int yinc2 = (sA >> 4) + (sA >> 3);      // 12*sA >> 6;
+    int xinc1 = (sAsB >> 5) + (sAsB >> 4);  // 6*sAsB >> 6;
+    int xinc2 = (cAsB >> 5) + (cAsB >> 4);  // 6*cAsB >> 6;
+    int xinc3 = (cB >> 5) + (cB >> 4);      // 6*cB >> 6;
+    int ycA = -((cA << 1) + (cA >> 2));     // -12 * yinc1 = -9*cA >> 2;
+    int ysA = -((sA << 1) + (sA >> 2));     // -12 * yinc2 = -9*sA >> 2;
     for (int j = 0; j < 23; j++, ycA += yinc1, ysA += yinc2) {
       int xsAsB = -40*xinc1;
       int xcAsB = -40*xinc2;
@@ -78,15 +74,15 @@ void main() {
         //int t = (int) (256 * dz) - r2i - r1i;
         int t = 512;
 
-        int px = p0x + (vxi16 >> 7); // assuming t = 512, t*vxi>>8 == vxi<<1
-        int py = p0y + (vyi16 >> 7);
-        int pz = p0z + (vzi16 >> 7);
+        int16_t px = p0x + (vxi16 >> 7); // assuming t = 512, t*vxi>>8 == vxi<<1
+        int16_t py = p0y + (vyi16 >> 7);
+        int16_t pz = p0z + (vzi16 >> 7);
         debug("pxyz (%+4d,%+4d,%+4d)\n", px, py, pz);
         for (;;) {
           int t0, t1, t2, d;
-          int lx = sB;
-          int ly = sAcB - cA;
-          int lz = -cAcB - sA;
+          int16_t lx = sB >> 2;
+          int16_t ly = sAcB - cA >> 2;
+          int16_t lz = -cAcB - sA >> 2;
           debug("[%2d,%2d] (px, py) = (%d, %d), (lx, ly) = (%d, %d) -> ", j, i, px, py, lx, ly);
           t0 = length_cordic(px, py, &lx, ly);
           debug("t0=%d (lx', ly') = (%d, %d)\n", t0, lx, ly);
@@ -101,7 +97,7 @@ void main() {
             putchar(' ');
             break;
           } else if (d < 2) {
-            int N = lz >> 11;
+            int N = lz >> 9;
             putchar(".,-~:;!*=#$@"[N > 0 ? N < 12 ? N : 11 : 0]);
             nnormals++;
             break;
