@@ -16,9 +16,7 @@ int length_cordic(int16_t x, int16_t y, int *x2_, int y2) {
   int x2 = *x2_;
   if (x < 0) { // start in right half-plane
     x = -x;
-    y = -y;
     x2 = -x2;
-    y2 = -y2;
   }
   for (int i = 0; i < 8; i++) {
     int t = x;
