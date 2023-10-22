@@ -29,44 +29,39 @@ int length_cordic(int16_t x, int16_t y) {
 
 void main() {
   // high-precision rotation directions
-  int16_t sBf = 0, cBf = 16384;
-  int16_t sAf = 11583, cAf = 11583;
+  int16_t sB = 0, cB = 16384;
+  int16_t sA = 11583, cA = 11583;
+  int16_t sAsB = 0, cAsB = 0;
+  int16_t sAcB = 11583, cAcB = 11583;
   for (;;) {
-    // 8.8 fixed version sines and cosines
-    int sA = sAf>>6, cA = cAf>>6;
-    int sB = sBf>>6, cB = cBf>>6;
+    int x1_16 = cAcB << 2;
 
-    int x0_16 = cB*sA;
-    int x1_16 = cA*cB;
+    int p0x = dz*sB >> 6;
+    int p0y = dz*sAcB >> 6;
+    int p0z = -dz*cAcB >> 6;
 
-    int p0x = dz*sB;
-    int p0y = dz*x0_16 >> 8;
-    int p0z = -dz*x1_16 >> 8;
-
-    int lxi = sB;
-    int lyi = -cA + (cB*sA>>8);
-    int lzi = (-cA*cB>>8) - sA;  // original lighting
-
-    debug("sA=%d cA=%d sB=%d cB=%d x0=%d x1=%d p0x=%d p0y=%d p0z=%d lxi=%d lyi=%d lzi=%d\n", sA, cA, sB, cB, x0_16, x1_16, p0x, p0y, p0z, lxi, lyi, lzi);
+    int lxi = sB >> 6;
+    int lyi = sAcB - cA >> 6;
+    int lzi = -cAcB - sA >> 6;
 
     const int r1i = r1*256;
     const int r2i = r2*256;
 
     int niters = 0;
     int nnormals = 0;
-    int yinc1 = 12*cA;
-    int yinc2 = 12*sA;
-    int xinc1 = 6*sA*sB >> 8;
-    int xinc2 = 6*cA*sB >> 8;
-    int xinc3 = 6*cB;
+    int yinc1 = 12*cA >> 6;
+    int yinc2 = 12*sA >> 6;
+    int xinc1 = 6*sAsB >> 6;
+    int xinc2 = 6*cAsB >> 6;
+    int xinc3 = 6*cB >> 6;
     int ycA = -12*yinc1;
     int ysA = -12*yinc2;
     for (int j = 0; j < 23; j++, ycA += yinc1, ysA += yinc2) {
       int xsAsB = -40*xinc1;
       int xcAsB = -40*xinc2;
-      int vxi16 = -40*xinc3 - (sB << 8);
-      int vyi16 = ycA - x0_16 - xsAsB;
-      int vzi16 = ysA + x1_16 + xcAsB;
+      int vxi16 = -40*xinc3 - (sB << 2);
+      int vyi16 = ycA - (sAcB<<2) - xsAsB;
+      int vzi16 = ysA + (cAcB<<2) + xcAsB;
       for (int i = 0; i < 79; i++, vyi16 -= xinc1, vzi16 += xinc2, vxi16 += xinc3) {
         //int t = (int) (256 * dz) - r2i - r1i;
         int t = 512;
@@ -109,8 +104,12 @@ void main() {
     }
     printf("%d iterations %d lit pixels", niters, nnormals);
     fflush(stdout);
-    R(5, cAf, sAf);
-    R(6, cBf, sBf);
+    R(5, cA, sA);
+    R(5, cAsB, sAsB);
+    R(5, cAcB, sAcB);
+    R(6, cB, sB);
+    R(6, cAcB, cAsB);
+    R(6, sAcB, sAsB);
     usleep(15000);
     printf("\r\x1b[23A");
   }
