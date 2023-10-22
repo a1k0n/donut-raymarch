@@ -6,14 +6,12 @@
 
 #define debug(...)
 
-//#define R(t,x,y) _t=x;x-=t*y;y+=t*_t;_t=(3-x*x-y*y)/2;x*=_t;y*=_t;
 #define R(s,x,y) x-=(y>>s);y+=(x>>s)
 const int dz = 5, r1 = 1, r2 = 2;
 
 // CORDIC algorithm to find magnitude of |x,y| in 8.8 fixed point
 int length_cordic(int16_t x, int16_t y) {
   if (x<0) x=-x;
-  //printf("%d %d (%f) ->", x, y, sqrt((float)x*x + (float)y*y));
   for (int i = 0; i < 8; i++) {
     int t=x;
     if (y<0) {
@@ -30,10 +28,6 @@ int length_cordic(int16_t x, int16_t y) {
 }
 
 void main() {
-  /*
-  float sA = 0, cA = 1,  // sines and cosines of
-        sB = 0, cB = 1,  // donut rotation angles A and B
-        */
   int16_t sBf = 0, cBf = 16384;
   int16_t sAf = 11583, cAf = 11583;
   for (;;) {
@@ -49,7 +43,6 @@ void main() {
     int lxi = sB;
     int lyi = -cA + (cB*sA>>8);
     int lzi = (-cA*cB>>8) - sA;  // original lighting
-    //float lx = cB, ly = -sA*sB, lz = cA*sB;  // lit from right side
 
     debug("sA=%d cA=%d sB=%d cB=%d x0=%d x1=%d p0x=%d p0y=%d p0z=%d lxi=%d lyi=%d lzi=%d\n", sA, cA, sB, cB, x0_16, x1_16, p0x, p0y, p0z, lxi, lyi, lzi);
 
@@ -58,14 +51,21 @@ void main() {
 
     int niters = 0;
     int nnormals = 0;
-    for (int j = 0; j < 23; j++) {
-      float y = (j-11)*.05;
-      for (int i = 0; i < 79; i++) {
-        float x = (i-39.5)*.025;
-        int x2 = sB*x;
-        int vxi = cB*x - sB;
-        int vyi = cA*y - (sA*x2 + x0_16 >> 8);
-        int vzi = (x1_16 + cA*x2 >> 8) + sA*y;
+    int yinc1 = 12*cA;
+    int yinc2 = 12*sA;
+    int xinc1 = 6*sA*sB;
+    int xinc2 = 6*cA*sB;
+    int xinc3 = 6*cB;
+    int ycA = -12*yinc1;
+    int ysA = -12*yinc2;
+    for (int j = 0; j < 23; j++, ycA += yinc1, ysA += yinc2) {
+      int xsAsB = -40*xinc1;
+      int xcAsB = -40*xinc2;
+      int xcB = -40*xinc3;
+      for (int i = 0; i < 79; i++, xsAsB += xinc1, xcAsB += xinc2, xcB += xinc3) {
+        int vxi = (xcB>>8) - sB;
+        int vyi = (ycA - (xsAsB>>8) - x0_16) >> 8;
+        int vzi = (x1_16 + (xcAsB>>8) + ysA) >> 8;
         //int t = (int) (256 * dz) - r2i - r1i;
         int t = 512;
         debug("[%2d,%2d] vxyz (%+4d,%+4d,%+4d) p0xyz (%+4d,%+4d,%+4d) t=%4d ", j, i, vxi, vyi, vzi, p0x, p0y, p0z, t);
