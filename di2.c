@@ -8,8 +8,18 @@
 #define debug(...)
 //#define debug printf
 
-#define R(s,x,y) x-=(y>>s);y+=(x>>s)
+// torus radii and distance from camera
+// these are pretty baked-in to other constants now, so it probably won't work
+// if you change them too much.
 const int dz = 5, r1 = 1, r2 = 2;
+
+// "Magic circle algorithm"? DDA? I've seen this formulation in a few places;
+// first in Hal Chamberlain's Musical Applications of Microprocessors, but not
+// sure what to call it, or how to justify it theoretically. It seems to
+// correctly rotate around a point "near" the origin, without losing magnitude
+// over long periods of time, as long as there are enough bits of precision in x
+// and y. I use 14 bits here.
+#define R(s,x,y) x-=(y>>s); y+=(x>>s)
 
 // CORDIC algorithm to find magnitude of |x,y|
 // also bring vector (x2,y2) along for the ride, and write back to x2
@@ -49,6 +59,7 @@ void main() {
   for (;;) {
     int x1_16 = cAcB << 2;
 
+    // yes this is a multiply but dz is 5 so it's (sb + (sb<<2)) >> 6 effectively
     int p0x = dz * sB >> 6;
     int p0y = dz * sAcB >> 6;
     int p0z = -dz * cAcB >> 6;
@@ -65,7 +76,7 @@ void main() {
     int16_t xincZ = (cAsB >> 7) + (cAsB >> 6);  // 6*cAsB >> 8;
     int16_t ycA = -((cA >> 1) + (cA >> 4));     // -12 * yinc1 = -9*cA >> 4;
     int16_t ysA = -((sA >> 1) + (sA >> 4));     // -12 * yinc2 = -9*sA >> 4;
-    int dmin = INT_MAX, dmax = -INT_MAX;
+    //int dmin = INT_MAX, dmax = -INT_MAX;
     for (int j = 0; j < 23; j++, ycA += yincC, ysA += yincS) {
       int xsAsB = (sAsB >> 4) - sAsB;  // -40*xincY
       int xcAsB = (cAsB >> 4) - cAsB;  // -40*xincZ;
@@ -105,30 +116,32 @@ void main() {
             break;
           }
           // todo: shift and add version of this
-          if (d < dmin) dmin = d;
-          if (d > dmax) dmax = d;
 
-          // d is about 2..800, so 10 bits are sufficient
-          if (0) {
+          /*
+            if (d < dmin) dmin = d;
+            if (d > dmax) dmax = d;
             px += d*vxi14 >> 14;
             py += d*vyi14 >> 14;
             pz += d*vzi14 >> 14;
-          } else {
-            // 11x15 3x parallel multiply shifted down 14
-            // only 16 bit registers needed; fixed 11 cycles
+          */
+          {
+            // 11x1.14 fixed point 3x parallel multiply
+            // only 16 bit registers needed; starts from highest bit to lowest
+            // d is about 2..1100, so 11 bits are sufficient
             int16_t dx = 0, dy = 0, dz = 0;
             int16_t a = vxi14, b = vyi14, c = vzi14;
-            for (int k = 0; k < 10; k++) {
+            while (d) {
               if (d&1024) {
                 dx += a;
                 dy += b;
                 dz += c;
               }
-              d <<= 1;
+              d = (d&1023) << 1;
               a >>= 1;
               b >>= 1;
               c >>= 1;
             }
+            // we already shifted down 10 bits, so get the last four
             px += dx >> 4;
             py += dy >> 4;
             pz += dz >> 4;
@@ -139,14 +152,18 @@ void main() {
       }
       puts("");
     }
-    printf("%d iterations %d lit pixels dmin=%d dmax=%d\x1b[K", niters, nnormals, dmin, dmax);
+    printf("%d iterations %d lit pixels\x1b[K", niters, nnormals);
     fflush(stdout);
+
+    // rotate sines, cosines, and products thereof
+    // this animates the torus rotation about two axes
     R(5, cA, sA);
     R(5, cAsB, sAsB);
     R(5, cAcB, sAcB);
     R(6, cB, sB);
     R(6, cAcB, cAsB);
     R(6, sAcB, sAsB);
+
     usleep(15000);
     printf("\r\x1b[23A");
   }
