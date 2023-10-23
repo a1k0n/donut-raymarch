@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <limits.h>
 #include <math.h>
 
 #define debug(...)
@@ -21,8 +20,11 @@ const int dz = 5, r1 = 1, r2 = 2;
 // and y. I use 14 bits here.
 #define R(s,x,y) x-=(y>>s); y+=(x>>s)
 
-// CORDIC algorithm to find magnitude of |x,y|
-// also bring vector (x2,y2) along for the ride, and write back to x2
+// CORDIC algorithm to find magnitude of |x,y| by rotating the x,y vector onto
+// the x axis. This also brings vector (x2,y2) along for the ride, and writes
+// back to x2 -- this is used to rotate the lighting vector from the normal of
+// the torus surface towards the camera, and thus determine the lighting amount.
+// We only need to keep one of the two lighting normal coordinates.
 int length_cordic(int16_t x, int16_t y, int16_t *x2_, int16_t y2) {
   int x2 = *x2_;
   if (x < 0) { // start in right half-plane
@@ -51,18 +53,17 @@ int length_cordic(int16_t x, int16_t y, int16_t *x2_, int16_t y2) {
 }
 
 void main() {
-  // high-precision rotation directions
+  // high-precision rotation directions, sines and cosines and their products
   int16_t sB = 0, cB = 16384;
   int16_t sA = 11583, cA = 11583;
   int16_t sAsB = 0, cAsB = 0;
   int16_t sAcB = 11583, cAcB = 11583;
-  for (;;) {
-    int x1_16 = cAcB << 2;
 
+  for (;;) {
     // yes this is a multiply but dz is 5 so it's (sb + (sb<<2)) >> 6 effectively
-    int p0x = dz * sB >> 6;
-    int p0y = dz * sAcB >> 6;
-    int p0z = -dz * cAcB >> 6;
+    int16_t p0x = dz * sB >> 6;
+    int16_t p0y = dz * sAcB >> 6;
+    int16_t p0z = -dz * cAcB >> 6;
 
     const int r1i = r1*256;
     const int r2i = r2*256;
