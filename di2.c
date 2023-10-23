@@ -46,7 +46,7 @@ int length_cordic(int16_t x, int16_t y, int16_t *x2_, int16_t y2) {
       y2 -= t2 >> i;
     }
   }
-  // divide by 0.625 as a cheap approximation to the 0.607 scaling factor factor
+  // divide by 0.625 as a cheap approximation to the 0.607 scaling factor
   // introduced by this algorithm (see https://en.wikipedia.org/wiki/CORDIC)
   *x2_ = (x2 >> 1) + (x2 >> 3);
   return (x >> 1) + (x >> 3);
@@ -77,7 +77,6 @@ void main() {
     int16_t xincZ = (cAsB >> 7) + (cAsB >> 6);  // 6*cAsB >> 8;
     int16_t ycA = -((cA >> 1) + (cA >> 4));     // -12 * yinc1 = -9*cA >> 4;
     int16_t ysA = -((sA >> 1) + (sA >> 4));     // -12 * yinc2 = -9*sA >> 4;
-    //int dmin = INT_MAX, dmax = -INT_MAX;
     for (int j = 0; j < 23; j++, ycA += yincC, ysA += yincS) {
       int xsAsB = (sAsB >> 4) - sAsB;  // -40*xincY
       int xcAsB = (cAsB >> 4) - cAsB;  // -40*xincZ;
@@ -116,28 +115,30 @@ void main() {
             nnormals++;
             break;
           }
-          // todo: shift and add version of this
 
-          /*
-            if (d < dmin) dmin = d;
-            if (d > dmax) dmax = d;
-            px += d*vxi14 >> 14;
-            py += d*vyi14 >> 14;
-            pz += d*vzi14 >> 14;
-          */
           {
+            /*
+              equivalent to:
+              px += d*vxi14 >> 14;
+              py += d*vyi14 >> 14;
+              pz += d*vzi14 >> 14;
+
+              idea is to make a 3d vector mul hw peripheral equivalent to this
+              algorithm
+            */
+
             // 11x1.14 fixed point 3x parallel multiply
             // only 16 bit registers needed; starts from highest bit to lowest
             // d is about 2..1100, so 11 bits are sufficient
             int16_t dx = 0, dy = 0, dz = 0;
             int16_t a = vxi14, b = vyi14, c = vzi14;
             while (d) {
-              if (d&1024) {
+              if (d & 1024) {
                 dx += a;
                 dy += b;
                 dz += c;
               }
-              d = (d&1023) << 1;
+              d = (d & 1023) << 1;
               a >>= 1;
               b >>= 1;
               c >>= 1;
