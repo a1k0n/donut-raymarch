@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
 #include <math.h>
 
 #define debug(...)
@@ -64,12 +65,12 @@ void main() {
     int16_t xincZ = (cAsB >> 7) + (cAsB >> 6);  // 6*cAsB >> 8;
     int16_t ycA = -((cA >> 1) + (cA >> 4));     // -12 * yinc1 = -9*cA >> 4;
     int16_t ysA = -((sA >> 1) + (sA >> 4));     // -12 * yinc2 = -9*sA >> 4;
+    int dmin = INT_MAX, dmax = -INT_MAX;
     for (int j = 0; j < 23; j++, ycA += yincC, ysA += yincS) {
-      //int xsAsB = -40*xincY;
       int xsAsB = (sAsB >> 4) - sAsB;  // -40*xincY
       int xcAsB = (cAsB >> 4) - cAsB;  // -40*xincZ;
 
-      int16_t vxi14 = (cB >> 4) - cB - sB; // -40*xincX - (sB << 2);
+      int16_t vxi14 = (cB >> 4) - cB - sB; // -40*xincX - sB;
       int16_t vyi14 = ycA - xsAsB - sAcB;
       int16_t vzi14 = ysA + xcAsB + cAcB;
 
@@ -80,11 +81,12 @@ void main() {
         int16_t py = p0y + (vyi14 >> 5);
         int16_t pz = p0z + (vzi14 >> 5);
         debug("pxyz (%+4d,%+4d,%+4d)\n", px, py, pz);
+        int16_t lx0 = sB >> 2;
+        int16_t ly0 = sAcB - cA >> 2;
+        int16_t lz0 = -cAcB - sA >> 2;
         for (;;) {
           int t0, t1, t2, d;
-          int16_t lx = sB >> 2;
-          int16_t ly = sAcB - cA >> 2;
-          int16_t lz = -cAcB - sA >> 2;
+          int16_t lx = lx0, ly = ly0, lz = lz0;
           debug("[%2d,%2d] (px, py) = (%d, %d), (lx, ly) = (%d, %d) -> ", j, i, px, py, lx, ly);
           t0 = length_cordic(px, py, &lx, ly);
           debug("t0=%d (lx', ly') = (%d, %d)\n", t0, lx, ly);
@@ -92,9 +94,7 @@ void main() {
           t2 = length_cordic(pz, t1, &lz, lx);
           d = t2 - r1i;
           t += d;
-          px += d*vxi14 >> 14;
-          py += d*vyi14 >> 14;
-          pz += d*vzi14 >> 14;
+
           if (t > 8*256) {
             putchar(' ');
             break;
@@ -104,12 +104,42 @@ void main() {
             nnormals++;
             break;
           }
+          // todo: shift and add version of this
+          if (d < dmin) dmin = d;
+          if (d > dmax) dmax = d;
+
+          // d is about 2..800, so 10 bits are sufficient
+          if (0) {
+            px += d*vxi14 >> 14;
+            py += d*vyi14 >> 14;
+            pz += d*vzi14 >> 14;
+          } else {
+            // 11x15 3x parallel multiply shifted down 14
+            // only 16 bit registers needed; fixed 11 cycles
+            int16_t dx = 0, dy = 0, dz = 0;
+            int16_t a = vxi14, b = vyi14, c = vzi14;
+            for (int k = 0; k < 10; k++) {
+              if (d&1024) {
+                dx += a;
+                dy += b;
+                dz += c;
+              }
+              d <<= 1;
+              a >>= 1;
+              b >>= 1;
+              c >>= 1;
+            }
+            px += dx >> 4;
+            py += dy >> 4;
+            pz += dz >> 4;
+          }
+
           niters++;
         }
       }
       puts("");
     }
-    printf("%d iterations %d lit pixels", niters, nnormals);
+    printf("%d iterations %d lit pixels dmin=%d dmax=%d\x1b[K", niters, nnormals, dmin, dmax);
     fflush(stdout);
     R(5, cA, sA);
     R(5, cAsB, sAsB);
