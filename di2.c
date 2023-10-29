@@ -4,6 +4,10 @@
 #include <unistd.h>
 #include <math.h>
 
+// 0 for 80x24, 1 for 160x48, etc
+#define RESX_SHIFT 1
+#define RESY_SHIFT 1
+
 #define debug(...)
 //#define debug printf
 
@@ -49,7 +53,7 @@ int length_cordic(int16_t x, int16_t y, int16_t *x2_, int16_t y2) {
   // divide by 0.625 as a cheap approximation to the 0.607 scaling factor
   // introduced by this algorithm (see https://en.wikipedia.org/wiki/CORDIC)
   *x2_ = (x2 >> 1) + (x2 >> 3);
-  return (x >> 1) + (x >> 3);
+  return (x >> 1) + (x >> 3) - (x >> 6);
 }
 
 void main() {
@@ -70,22 +74,33 @@ void main() {
 
     int niters = 0;
     int nnormals = 0;
-    int16_t yincC = (cA >> 6) + (cA >> 5);      // 12*cA >> 8;
-    int16_t yincS = (sA >> 6) + (sA >> 5);      // 12*sA >> 8;
-    int16_t xincX = (cB >> 7) + (cB >> 6);      // 6*cB >> 8;
-    int16_t xincY = (sAsB >> 7) + (sAsB >> 6);  // 6*sAsB >> 8;
-    int16_t xincZ = (cAsB >> 7) + (cAsB >> 6);  // 6*cAsB >> 8;
+
+    // per-row increments
+    // these can all be compiled into two shifts and an add
+    int16_t yincC = (12*cA) >> (8 + RESY_SHIFT);
+    int16_t yincS = (12*sA) >> (8 + RESY_SHIFT);
+
+    // per-column increments
+    int16_t xincX = (6*cB) >> (8 + RESX_SHIFT);
+    int16_t xincY = (6*sAsB) >> (8 + RESX_SHIFT);
+    int16_t xincZ = (6*cAsB) >> (8 + RESX_SHIFT);
+
+    // top row y cosine/sine
     int16_t ycA = -((cA >> 1) + (cA >> 4));     // -12 * yinc1 = -9*cA >> 4;
     int16_t ysA = -((sA >> 1) + (sA >> 4));     // -12 * yinc2 = -9*sA >> 4;
-    for (int j = 0; j < 23; j++, ycA += yincC, ysA += yincS) {
+
+    for (int j = 0; j < (24<<RESY_SHIFT)-1; j++, ycA += yincC, ysA += yincS) {
+      // left columnn x cosines/sines
       int xsAsB = (sAsB >> 4) - sAsB;  // -40*xincY
       int xcAsB = (cAsB >> 4) - cAsB;  // -40*xincZ;
 
+      // ray direction
       int16_t vxi14 = (cB >> 4) - cB - sB; // -40*xincX - sB;
-      int16_t vyi14 = ycA - xsAsB - sAcB;
-      int16_t vzi14 = ysA + xcAsB + cAcB;
+      int16_t vyi14 = (ycA - xsAsB - sAcB);
+      int16_t vzi14 = (ysA + xcAsB + cAcB);
 
-      for (int i = 0; i < 79; i++, vxi14 += xincX, vyi14 -= xincY, vzi14 += xincZ) {
+      for (int i = 0; i < ((80<<RESX_SHIFT) - 1);
+          i++, vxi14 += xincX, vyi14 -= xincY, vzi14 += xincZ) {
         int t = 512; // (256 * dz) - r2i - r1i;
 
         int16_t px = p0x + (vxi14 >> 5); // assuming t = 512, t*vxi>>8 == vxi<<1
@@ -154,7 +169,7 @@ void main() {
       }
       puts("");
     }
-    printf("%d iterations %d lit pixels\x1b[K", niters, nnormals);
+    debug("%d iterations %d lit pixels\x1b[K", niters, nnormals);
     fflush(stdout);
 
     // rotate sines, cosines, and products thereof
@@ -167,6 +182,6 @@ void main() {
     R(6, sAcB, sAsB);
 
     usleep(15000);
-    printf("\r\x1b[23A");
+    printf("\r\x1b[%dA", (24<<RESY_SHIFT)-1);
   }
 }
